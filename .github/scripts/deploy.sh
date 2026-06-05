@@ -9,13 +9,22 @@ echo "Services: $SERVICES"
 cd "$APP_DIR"
 git fetch origin
 git reset --hard origin/main
+
+# Support both docker compose and docker-compose
+if command -v docker-compose &> /dev/null; then
+    DC="docker-compose"
+else
+    DC="docker compose"
+fi
+echo "Using: $DC"
+
 wait_for_service() {
     local service=$1
     local max_attempts=30
     local attempt=1
     echo "Waiting for $service..."
     while [ $attempt -le $max_attempts ]; do
-        if docker-compose ps | grep "$service" | grep -q "Up"; then
+        if $DC ps | grep "$service" | grep -q "Up"; then
             echo "✓ $service is up"
             return 0
         fi
@@ -28,8 +37,8 @@ wait_for_service() {
 }
 deploy_all_services() {
     echo "Deploying all services..."
-    docker-compose down
-    docker-compose up -d --build
+    $DC down
+    $DC up -d --build
     wait_for_service "db"
     wait_for_service "redis"
     wait_for_service "backend"
@@ -42,11 +51,11 @@ deploy_specific_services() {
         [ -z "$service" ] && continue
         echo "Deploying: $service"
         if [ "$service" = "backend" ]; then
-            docker-compose up -d db redis
+            $DC up -d db redis
             wait_for_service "db"
             wait_for_service "redis"
         fi
-        docker-compose up -d --build --no-deps "$service"
+        $DC up -d --build --no-deps "$service"
         wait_for_service "$service"
         echo "✓ $service deployed"
     done
@@ -61,4 +70,4 @@ else
     fi
 fi
 echo "=== Deployment complete ==="
-docker-compose ps
+$DC ps
